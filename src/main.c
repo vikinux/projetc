@@ -51,7 +51,7 @@ FILE * ouverture(char * nomFichier){
 	return fichier;
 }
 
-void date( char * line){
+char * date( char * line){
 
 	char * str = NULL;
 	char * token = malloc(sizeof(char)*1024);
@@ -64,14 +64,15 @@ void date( char * line){
 
 	printf(":: %s :: %s \n",token,token2);
 
+	return token2;
 }
 
-void param(char * line){
+void param(char * line, int nbRun, struct sqlite3 *db){
 
 	char * token = malloc(sizeof(char)*1024);
 	char * token2 =  malloc(sizeof(char)*1024);
 	char * token3 =  malloc(sizeof(char)*1024);
-
+	
 	
 	token  = strtok( line, " |\n");
 	line = NULL;
@@ -79,18 +80,21 @@ void param(char * line){
 	line = NULL;
 	token3 = strtok(line, " |\n");
 
+	
 
-	printf(":: %s :: %s :: %s\n",token,token2,token3);
+
+	createCommande(db, "INSERT INTO bob values(%s,%s,%s)\");");
+
+//	printf(":: %s :: %s :: %s\n",token,token2,token3);
 
 
 }
 
-void parseDuFichier( FILE * fichier){
+void parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 	char * ligne = malloc(sizeof(char)*1024);
-
-
-
+	int nbRun = 0;
+	char * laDate = malloc(sizeof(char)*1024);
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
 
@@ -98,13 +102,14 @@ void parseDuFichier( FILE * fichier){
 	//	printf("%s \n",ligne);
 		if(ligne[0] == '-'){
 			fscanf(fichier, "%[^\n]\n", ligne); 
-			date(ligne);
+			laDate = date(ligne);
+			nbRun ++;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 		}
 		else {
-			param(ligne);
+			param(ligne, nbRun, db);
 		}
 	}
 
@@ -117,12 +122,13 @@ int main(int argc, char **argv){
 
 	fichier = ouverture("stat.log");
 
-	parseDuFichier(fichier);	
+
 
 	if(argc > 1) {
 		db = createDataBase( db, argv[1]);
-		createCommande(db, "CREATE TABLE bob (\"col1 char(50), col2 char(50)\");");
+		createCommande(db, "CREATE TABLE bob (\"col1 char(50), col2 char(50), col3 int\");");
 	}
+	parseDuFichier(fichier, db);	
 
 	return 0;
 }
