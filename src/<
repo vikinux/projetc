@@ -53,35 +53,10 @@ FILE * ouverture(char * nomFichier){
 
 void date( char * line){
 
-	char * str = NULL;
-	char * token = malloc(sizeof(char)*1024);
-	char * token2 =  malloc(sizeof(char)*1024);
-
+	char * str1;
+	char * token = strtok_r( line, '-', &str1);
 	
-	token  = strtok_r( line, ":",&str);
-	line = NULL;
-	token2 = strtok_r(line, "-",&str);
-
-	printf(":: %s :: %s \n",token,token2);
-
-}
-
-void param(char * line){
-
-	char * token = malloc(sizeof(char)*1024);
-	char * token2 =  malloc(sizeof(char)*1024);
-	char * token3 =  malloc(sizeof(char)*1024);
-
-	
-	token  = strtok( line, " |\n");
-	line = NULL;
-	token2 = strtok(line, " |\n");
-	line = NULL;
-	token3 = strtok(line, " |\n");
-
-
-	printf(":: %s :: %s :: %s\n",token,token2,token3);
-
+	printf("%s : %s \n",str1,token);
 
 }
 
@@ -89,25 +64,22 @@ void parseDuFichier( FILE * fichier){
 
 	char * ligne = malloc(sizeof(char)*1024);
 
-
+		
 
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
 
-
-	//	printf("%s \n",ligne);
 		if(ligne[0] == '-'){
 			fscanf(fichier, "%[^\n]\n", ligne); 
 			date(ligne);
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
-		}
-		else {
-			param(ligne);
-		}
-	}
 
+
+	}
+}
+	
 }
 
 int main(int argc, char **argv){
