@@ -10,7 +10,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 	for(i=0; i<argc; i++){
 		printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
 	}
-	printf("\n");
+	//printf("bob\n");
 	return 0;
 }
 
@@ -35,7 +35,6 @@ int createCommande(sqlite3 * db, char * commande ){
 		sqlite3_free(zErrMsg);
 	}
 
-	printf("%d  commande : %s\n\n",rc, commande);
 	return rc;
 }
 
@@ -51,27 +50,35 @@ FILE * ouverture(char * nomFichier){
 	return fichier;
 }
 
-char * date( char * line){
+char * date( char * line, int run,struct sqlite3 *db){
 
-	char * str = NULL;
+	char * str = NULL; 
 	char * token = malloc(sizeof(char)*1024);
 	char * token2 =  malloc(sizeof(char)*1024);
+	char * token3 =  malloc(sizeof(char)*1024);
+	char * token4 =  malloc(sizeof(char)*1024);	
 
-	
-	token  = strtok_r( line, ":",&str);
-	line = NULL;
-	token2 = strtok_r(line, "-",&str);
+	strtok_r( line, ":",&str);
+	token2 = strtok_r(NULL, "-",&str);
+	strtok_r(NULL, " ",&str);
+	token3 = strtok_r(NULL,"(",&str);
+	strtok_r( NULL, ":",&str);
+	token4 = strtok_r(NULL, ")",&str);
 
-	printf(":: %s :: %s \n",token,token2);
+	sprintf(token,"INSERT INTO info values(\"%s\",\"%s\",\"%s\",%d);",token2,token3,token4,run);
+	//printf(":: :: %s :: %s :: %s\n",token2,token3,token4);
+
+	createCommande(db, token);
 
 	return token2;
 }
 
-void param(char * line, int nbRun, struct sqlite3 *db){
+void param(char * line, int nbrun, struct sqlite3 *db){
 
 	char * token = malloc(sizeof(char)*1024);
 	char * token2 =  malloc(sizeof(char)*1024);
 	char * token3 =  malloc(sizeof(char)*1024);
+	char * commande = malloc(sizeof(char)*1024);
 	
 	
 	token  = strtok( line, " |\n");
@@ -80,30 +87,26 @@ void param(char * line, int nbRun, struct sqlite3 *db){
 	line = NULL;
 	token3 = strtok(line, " |\n");
 
-	
+	sprintf(commande,"INSERT INTO param values(\"%s\",\"%s\",\"%s\",%d);",token,token2,token3,nbrun);
 
-
-	createCommande(db, "INSERT INTO bob values(%s,%s,%s)\");");
-
-//	printf(":: %s :: %s :: %s\n",token,token2,token3);
-
-
+	createCommande(db, commande);
 }
 
 void parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 	char * ligne = malloc(sizeof(char)*1024);
 	int nbRun = 0;
-	char * laDate = malloc(sizeof(char)*1024);
+
+
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
 
-
+	
 	//	printf("%s \n",ligne);
 		if(ligne[0] == '-'){
-			fscanf(fichier, "%[^\n]\n", ligne); 
-			laDate = date(ligne);
 			nbRun ++;
+			fscanf(fichier, "%[^\n]\n", ligne); 
+			date(ligne,nbRun,db);
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
@@ -111,6 +114,7 @@ void parseDuFichier( FILE * fichier, struct sqlite3 *db){
 		else {
 			param(ligne, nbRun, db);
 		}
+
 	}
 
 }
@@ -126,9 +130,13 @@ int main(int argc, char **argv){
 
 	if(argc > 1) {
 		db = createDataBase( db, argv[1]);
-		createCommande(db, "CREATE TABLE bob (\"col1 char(50), col2 char(50), col3 int\");");
+		createCommande(db, "PRAGMA synchronous = OFF;");
+		createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, col4 int);");
+		createCommande(db, "CREATE TABLE info (date char(50),heure char(50), uptime char(50), run int);");
 	}
+	printf("  En cours ...\n");
 	parseDuFichier(fichier, db);	
 
+	printf("  Fini!\n");	
 	return 0;
 }
