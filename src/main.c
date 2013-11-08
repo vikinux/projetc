@@ -42,11 +42,11 @@ void view(pile *p){
 
 /******************************INSERTION : database insertion's callback*************/
 
-static int callback(void *NotUsed, int argc, char **argv, char **azColName){
+static int callback(void *NotUsed, int argc, char **argv, char **azColName){ 
 	int i;
 	if(NotUsed){}
 	for(i=0; i<argc; i++){
-		printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+		printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");   // Show the result of the SQLITE3 query
 	}
 	return 0;
 }
@@ -58,8 +58,8 @@ static int callback_cal(void * mapile, int argc, char **argv, char **azColName){
 
 	pile *element = malloc(sizeof(pile));
 	if(!element) exit(EXIT_FAILURE);    
-	element->valeur =  strdup(argv[0]);
-	element->next = (*p);
+	element->valeur =  strdup(argv[0]);			// Save the result of the SQLITE3 query in the beginning of the list 
+	element->next = (*p);					// Callback_cal is executed for each line of the database response
 	*p = element;      
 
 	return 0;
@@ -69,7 +69,7 @@ static int callback_cal(void * mapile, int argc, char **argv, char **azColName){
 
 sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 	int rc;
-	rc =  sqlite3_open_v2(dbName,&db,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE,NULL);
+	rc =  sqlite3_open_v2(dbName,&db,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE,NULL);  // Open the database and create it if it doesn't exist
 	if(rc){
 		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
 		sqlite3_close(db);
@@ -78,12 +78,12 @@ sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 	return db;
 }
 
-/****************************INSERTION AND STATS : Creation of sqlite queries************************************************/
+/****************************INSERTION : Creation of sqlite queries************************************************/
 
 int createCommande(sqlite3 * db, char * commande ){
 	int rc=-1;
 	char *zErrMsg = 0;
-	rc = sqlite3_exec(db, commande,callback,0, &zErrMsg);
+	rc = sqlite3_exec(db, commande,callback,0, &zErrMsg);		// Execute the commande and send the response in the callback
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
@@ -98,7 +98,7 @@ FILE * ouverture(char * nomFichier){
 
 	FILE * fichier;
 
-	fichier = fopen(nomFichier,"r");
+	fichier = fopen(nomFichier,"r");			// Open the file in read only mod 
 
 	if(fichier == NULL){
 		printf("\nImpossible d'ouvrir le fichier log \n\n");
@@ -118,27 +118,27 @@ long long int date( char * line, struct sqlite3 *db, int nbRun, int previous){
 	long long int uphour;
 	char * tmp =  malloc(sizeof(char)*1024);
 
-	sscanf(line, "Date: %d/%d/%d -- %d:%d:%d (uptime: %dd, %dh %dm %ds) \n", &jour, &mois ,&ans,&heure,&min,&sec,&up_d,&up_h,&up_m,&up_s);
+	sscanf(line, "Date: %d/%d/%d -- %d:%d:%d (uptime: %dd, %dh %dm %ds) \n", &jour, &mois ,&ans,&heure,&min,&sec,&up_d,&up_h,&up_m,&up_s);	// Parse the line and save the wanted values 
 
-	uptime = (up_s) +(up_m *60)+(up_h *60*60)+(up_d *24*60*60);
-	uphour = (sec) +(min *60)+(heure *60*60);
-	sprintf(tmp, "%d/%d/%d %d:%d:%d",jour,mois,ans,heure,min,sec);
+	uptime = (up_s) +(up_m *60)+(up_h *60*60)+(up_d *24*60*60);		// convert the uptime into second
+	uphour = (sec) +(min *60)+(heure *60*60);				// convert the hour into second
+	sprintf(tmp, "%d/%d/%d %d:%d:%d",jour,mois,ans,heure,min,sec);		// Formats the date
 
-	if(uptime < previous){
+	if(uptime < previous){							// detect if it's a new run
 		nbRun ++;
 
-		sprintf(token,"INSERT INTO info values(\"%s\",\"%s\",%lld,%lld,%d);",tmp, tmp ,uphour,uptime,nbRun);
+		sprintf(token,"INSERT INTO info values(\"%s\",\"%s\",%lld,%lld,%d);",tmp, tmp ,uphour,uptime,nbRun); // Format the SQLITE3 query
 
 		createCommande(db, token);
 
 	}else{
-		sprintf(token,"UPDATE info SET uptime = %lld WHERE run = %d;",uptime,nbRun);
-		createCommande(db, token);
-		sprintf(token,"UPDATE info SET datefin = \"%s\" WHERE run = %d;",tmp,nbRun);
-		createCommande(db, token);
+		sprintf(token,"UPDATE info SET uptime = %lld WHERE run = %d;",uptime,nbRun);		// Format the SQLITE3 query
+		createCommande(db, token);								// Create the SQLITE3 query
+		sprintf(token,"UPDATE info SET datefin = \"%s\" WHERE run = %d;",tmp,nbRun);		// Format the SQLITE3 query
+		createCommande(db, token);								// Create the SQLITE3 query
 	}
 
-	free(token);
+	free(token);											//free the resource
 	free(tmp);
 
 	return uptime;
@@ -153,14 +153,14 @@ void param(char * line, int nbDump, struct sqlite3 *db, int nbRun){
 	char * token3 =  malloc(sizeof(char)*1024);
 	char * commande = malloc(sizeof(char)*1024);
 
-	sscanf(line, " %s | %s | %s \n", token, token2, token3);
+	sscanf(line, " %s | %s | %s \n", token, token2, token3); // Parse the line and save the wanted values 
 
-	sprintf(commande,"INSERT INTO param values(\"%s\",\"%s\",\"%s\",%d,%d);",token,token2,token3,nbDump,nbRun);
+	sprintf(commande,"INSERT INTO param values(\"%s\",\"%s\",\"%s\",%d,%d);",token,token2,token3,nbDump,nbRun); // Format the SQLITE3 query
 
-	createCommande(db, commande);
+	createCommande(db, commande);			// Create the SQLITE3 query
 
 	free(token);
-	free(token2);
+	free(token2);					//free the resource
 	free(token3);
 	free(commande);
 }
@@ -172,6 +172,7 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 	char * ligne = malloc(sizeof(char)*1024);
 	int nbDump = 0;
 	int nbRun = 0;
+	int i=0;
 	int nbDumpTotal=0;
 	long long int previous_runtime = 100;
 	long long int runtime = 0;
@@ -179,14 +180,15 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
+		if(i == 0)
+			createCommande(db,"BEGIN TRANSACTION");		// Tell the database that it has to wait before commiting our queries
+									// Greatly increase the speed of the execution speed of the queries
 		if(ligne[0] == '-'){
-			nbDump ++;
+			nbDump ++;					// count the amount of Dump in the currently run
 			fscanf(fichier, "%[^\n]\n", ligne);
 
-			runtime = date(ligne,db, nbRun, previous_runtime);
-
-
-			if(runtime >= previous_runtime){
+			runtime = date(ligne,db, nbRun, previous_runtime);  // Parse the date line and return the last dump uptime
+			if(runtime >= previous_runtime){			// Test if it's a new run
 				previous_runtime = runtime;
 			}
 			else{
@@ -194,19 +196,25 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 				previous_runtime = runtime;
 				nbDumpTotal += nbDump;
 				nbDump = 0;
-
+	
 			}
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 		}
 		else {
-			param(ligne, nbDump, db, nbRun);
+			param(ligne, nbDump, db, nbRun);			// Parse the parameters line
 		}
+		i++;
+		if(i == 500){
+			i = 0;
+			createCommande(db,"COMMIT TRANSACTION");		// Commit all the queries every 500 queries
+		}								// 500 is the optimized amount of queries before commiting
+			
 	}
-	nbDumpTotal += nbDump;
+	nbDumpTotal += nbDump;							// count the total of dump during the execution
 
-	free(ligne);
+	free(ligne);								// free the resource
 	sprintf(resultat,"D:%d R:%d",nbDumpTotal, nbRun);
 	return resultat;
 
@@ -223,21 +231,20 @@ int requeteDureeRun(struct sqlite3 *db, int nbRun){
 	char * commande = malloc(sizeof(char)*1024);
 
 
-	pile *element = malloc(sizeof(pile));
+	pile *element = malloc(sizeof(pile));			// create an empty cell
 	if(!element) exit(EXIT_FAILURE);    
 	element->valeur =  NULL;
 	element->next =  NULL;
-	pileTime = element;       
 
 	sprintf(commande, "SELECT uptime FROM info WHERE run = %d;",nbRun);
 
-	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);   //fill the linked list element with the query's result
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
-	pileTime = (pile *) element;
+	pileTime = (pile *) element;		// we cast element into pile * because the callback change it into a void *
 
 	uptime = atoi(pileTime->valeur);
 
@@ -256,9 +263,9 @@ void requetedebutfin(struct sqlite3 *db, int nbRun){
 	pile *pileDate = NULL;
 	char *zErrMsg = 0;
 
-	pile *element = malloc(sizeof(pile));
-	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
-	element->valeur =  NULL;
+	pile *element = malloc(sizeof(pile));   
+	if(!element) exit(EXIT_FAILURE);    
+	element->valeur =  NULL;			// create a empty cell
 	element->next =  NULL;
 
 
@@ -266,22 +273,22 @@ void requetedebutfin(struct sqlite3 *db, int nbRun){
 	sprintf(commande, "SELECT datedebut FROM info WHERE run = %d;",nbRun);
 
 
-	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);		//fill the linked list element with the query's result
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
-	pileDate = (pile *) element;  
+	pileDate = (pile *) element;  							// we cast element into pile * because the callback change it into a void *
 	debut = pileDate->valeur;
 
-	sprintf(commande, "SELECT datefin FROM info WHERE run = %d;",nbRun);
-	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
+	sprintf(commande, "SELECT datefin FROM info WHERE run = %d;",nbRun);	
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);		//fill the linked list element with the query's result
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
-	pileDate = (pile *) element;  
+	pileDate = (pile *) element;  							// we cast element into pile * because the callback change it into a void *
 
 	fin = pileDate->valeur;
 
@@ -316,16 +323,16 @@ long long int nbdrop(struct sqlite3 *db, int nbRun, char * thread){
 	long long int resultat = 0;
 
 	pile *element = malloc(sizeof(pile));
-	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	if(!element) exit(EXIT_FAILURE);  
 	element->valeur =  NULL;
-	element->next =  NULL;
-	pileDrop = element;       /* Le pointeur pointe sur le dernier élément. */
+	element->next =  NULL;				// Creat an empty cell
+	pileDrop = element;       
 
 	char * commande = malloc(sizeof(char)*1024);
-	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_drops\" %s;",nbRun,thread);
+	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_drops\" %s;",nbRun,thread); 
 
 
-	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);	//fill the linked list element with the query's result
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
@@ -351,15 +358,15 @@ long long int nbpacket(struct sqlite3 *db, int nbRun, char * thread){
 	long long int resultat = 0;
 
 	pile *element = malloc(sizeof(pile));
-	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	if(!element) exit(EXIT_FAILURE);     
 	element->valeur =  NULL;
 	element->next =  NULL;
-	pilePacket = element;       /* Le pointeur pointe sur le dernier élément. */
+	pilePacket = element;
 
 	char * commande = malloc(sizeof(char)*1024);
 	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_packets\" %s;",nbRun, thread);
 
-	rc = sqlite3_exec(db,commande,callback_cal,&element, &zErrMsg);
+	rc = sqlite3_exec(db,commande,callback_cal,&element, &zErrMsg);  //fill the linked list element with the query's result
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
@@ -383,8 +390,6 @@ void calculRatioDrop(struct sqlite3 *db, int nbRun){
 	resultat = drops * 100 / packets;
 
 	printf("ratio kernel drop pour run %d = %d / 100 \n",nbRun,resultat);
-	//view( mapile);
-
 }
 
 /************************STATS : Calculates the averange of drops packet of a thread in a run********************************************/
@@ -445,7 +450,7 @@ int main(int argc, char **argv){
 	int nbRun, nbDump;
 	fichier = ouverture("stat.log");
 
-	while( (opt = getopt(argc, argv, "hcds")) !=-1){
+	while( (opt = getopt(argc, argv, "hcds")) !=-1){	// Switch between execution's options
 
 		switch (opt){
 
@@ -459,8 +464,8 @@ int main(int argc, char **argv){
 				if(argc == 3){
 					db = createDataBase( db, argv[2]);
 					printf("  En cours ...\n");
-					createCommande(db, "PRAGMA synchronous = OFF;");
-					createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, dump int, run int);");
+					createCommande(db, "PRAGMA synchronous = OFF;");	// Tell the database that it doesn't have to test every queries
+					createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, dump int, run int);"); // create the database tables
 					createCommande(db, "CREATE TABLE info (datedebut char(50),datefin char(50),heure int, uptime int, run int);");
 					sscanf(parseDuFichier(fichier, db),"D:%d R:%d",&nbDump,&nbRun);
 					printf("nb de run : %d, nb de dump %d\n", nbRun , nbDump);	

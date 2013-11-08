@@ -172,6 +172,7 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 	char * ligne = malloc(sizeof(char)*1024);
 	int nbDump = 0;
 	int nbRun = 0;
+	int i=0;
 	int nbDumpTotal=0;
 	long long int previous_runtime = 100;
 	long long int runtime = 0;
@@ -179,13 +180,14 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
+		if(i == 0)
+			createCommande(db,"BEGIN TRANSACTION");
+
 		if(ligne[0] == '-'){
 			nbDump ++;
 			fscanf(fichier, "%[^\n]\n", ligne);
 
 			runtime = date(ligne,db, nbRun, previous_runtime);
-
-
 			if(runtime >= previous_runtime){
 				previous_runtime = runtime;
 			}
@@ -194,7 +196,7 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 				previous_runtime = runtime;
 				nbDumpTotal += nbDump;
 				nbDump = 0;
-
+	
 			}
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
@@ -203,6 +205,12 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 		else {
 			param(ligne, nbDump, db, nbRun);
 		}
+		i++;
+		if(i == 500){
+			i = 0;
+			createCommande(db,"COMMIT TRANSACTION");
+		}
+		
 	}
 	nbDumpTotal += nbDump;
 
