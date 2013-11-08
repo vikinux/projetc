@@ -1,3 +1,7 @@
+/* author : MULLER Rémy */
+/* date : 08/11/2013    */
+
+
 #include <stdio.h>
 #include <sqlite3.h>
 #include <stdlib.h>
@@ -5,14 +9,14 @@
 #include <unistd.h>
 
 
-/****************************************************************************/
+/****************************Structure of the linked list*******************/
 typedef struct pile
 {
 	char * valeur;
 	struct pile *next;
 } pile ;
 
-/****************************************************************************/
+/****************************Suppression of the linked list******************/
 
 void supr(pile *l)
 {
@@ -25,7 +29,7 @@ void supr(pile *l)
 	}
 }
 
-/****************************************************************************/
+/*****************************show linked list values***************************/
 
 void view(pile *p){
 	p=p->next;
@@ -36,7 +40,7 @@ void view(pile *p){
 	}
 }
 
-/****************************************************************************/
+/******************************INSERTION : database insertion's callback*************/
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 	int i;
@@ -46,25 +50,22 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 	}
 	return 0;
 }
-/****************************************************************************/
+/********************STATS : Insertion of the sqlite request in the linked list. Insertion on the begining of the list******/
 
 static int callback_cal(void * mapile, int argc, char **argv, char **azColName){
 
 	pile **p = (pile **) mapile;
 
 	pile *element = malloc(sizeof(pile));
-	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	if(!element) exit(EXIT_FAILURE);    
 	element->valeur =  strdup(argv[0]);
 	element->next = (*p);
 	*p = element;      
 
-	//	printf("%s \n",(*p)->valeur);
-
-
 	return 0;
 }
 
-/****************************************************************************/
+/*****************************INSERTION AND STATS : Create or open the database***********************************************/
 
 sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 	int rc;
@@ -77,7 +78,7 @@ sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 	return db;
 }
 
-/****************************************************************************/
+/****************************INSERTION AND STATS : Creation of sqlite queries************************************************/
 
 int createCommande(sqlite3 * db, char * commande ){
 	int rc=-1;
@@ -91,7 +92,7 @@ int createCommande(sqlite3 * db, char * commande ){
 	return rc;
 }
 
-/****************************************************************************/
+/**************************************INSERTION : Opening of stat.log*****************************/
 
 FILE * ouverture(char * nomFichier){
 
@@ -105,7 +106,7 @@ FILE * ouverture(char * nomFichier){
 	return fichier;
 }
 
-/****************************************************************************/
+/********************************INSERTION  : parsing run information********************************************/
 
 long long int date( char * line, struct sqlite3 *db, int nbRun, int previous){
 
@@ -143,7 +144,7 @@ long long int date( char * line, struct sqlite3 *db, int nbRun, int previous){
 	return uptime;
 }
 
-/****************************************************************************/
+/******************************INSERTION : parsing dump information**********************************************/
 
 void param(char * line, int nbDump, struct sqlite3 *db, int nbRun){
 
@@ -164,7 +165,7 @@ void param(char * line, int nbDump, struct sqlite3 *db, int nbRun){
 	free(commande);
 }
 
-/****************************************************************************/
+/*********************************INSERTION  : file reading. return the amount of dump and run*******************************************/
 
 char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
@@ -211,7 +212,7 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 }
 
-/****************************************************************************/
+/********************************STATS :Run duration********************************************/
 
 int requeteDureeRun(struct sqlite3 *db, int nbRun){
 
@@ -223,10 +224,10 @@ int requeteDureeRun(struct sqlite3 *db, int nbRun){
 
 
 	pile *element = malloc(sizeof(pile));
-	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	if(!element) exit(EXIT_FAILURE);    
 	element->valeur =  NULL;
 	element->next =  NULL;
-	pileTime = element;       /* Le pointeur pointe sur le dernier élément. */
+	pileTime = element;       
 
 	sprintf(commande, "SELECT uptime FROM info WHERE run = %d;",nbRun);
 
@@ -245,7 +246,7 @@ int requeteDureeRun(struct sqlite3 *db, int nbRun){
 	return uptime;
 }
 
-/****************************************************************************/
+/******************************STATS : end and**********************************************/
 
 void requetedebutfin(struct sqlite3 *db, int nbRun){
 
@@ -289,7 +290,7 @@ void requetedebutfin(struct sqlite3 *db, int nbRun){
 
 }
 
-/****************************************************************************/
+/***********************STATS : return the largest value of the list *****************************************************/
 
 long long int plusgrand(pile * p){
 
@@ -305,7 +306,7 @@ long long int plusgrand(pile * p){
 	return resultat;
 }
 
-/****************************************************************************/
+/**************************STATS : Count the amout of drops of a thread in a run**************************************************/
 
 long long int nbdrop(struct sqlite3 *db, int nbRun, char * thread){
 
@@ -340,7 +341,7 @@ long long int nbdrop(struct sqlite3 *db, int nbRun, char * thread){
 	return resultat;
 }
 
-/****************************************************************************/
+/*********************************STATS : Count the amout of packets of a thread in a run*******************************************/
 
 long long int nbpacket(struct sqlite3 *db, int nbRun, char * thread){
 
@@ -371,7 +372,7 @@ long long int nbpacket(struct sqlite3 *db, int nbRun, char * thread){
 	return resultat;
 }
 
-/****************************************************************************/
+/******************************STATS : calculates the ration of drops / packets**********************************************/
 
 void calculRatioDrop(struct sqlite3 *db, int nbRun){
 
@@ -381,12 +382,12 @@ void calculRatioDrop(struct sqlite3 *db, int nbRun){
 
 	resultat = drops * 100 / packets;
 
-	printf("ratio kernel drop pour run %d = %d pourcents \n",nbRun,resultat);
+	printf("ratio kernel drop pour run %d = %d / 100 \n",nbRun,resultat);
 	//view( mapile);
 
 }
 
-/****************************************************************************/
+/************************STATS : Calculates the averange of drops packet of a thread in a run********************************************/
 
 void moyennedroprun(struct sqlite3 * db, int nbRun, char * thread){
 
@@ -406,7 +407,7 @@ void moyennedroprun(struct sqlite3 * db, int nbRun, char * thread){
 
 }
 
-/****************************************************************************/
+/******************************STATS : Calculates the averange of packets of a thread in a run*************************************/
 
 void moyennepacketrun(struct sqlite3 * db, int nbRun, char * thread){
 
@@ -424,7 +425,7 @@ void moyennepacketrun(struct sqlite3 * db, int nbRun, char * thread){
 
 }
 
-/****************************************************************************/
+/******************************SUPPRESSION : delete the database**********************************************/
 
 void supprim(char * filename){
 
@@ -434,8 +435,8 @@ void supprim(char * filename){
 }
 
 /****************************************************************************/
+/*************************************MAIN***********************************/
 /****************************************************************************/
-
 int main(int argc, char **argv){
 
 	int opt; 
@@ -449,26 +450,41 @@ int main(int argc, char **argv){
 		switch (opt){
 
 			case 'h':
-				printf("--HELP-- \n -h --Aide \n -c [NomBase] --Creer une base de donnée \n -d [NomBase]--Supprimer une base de donnée \n -s [NomBase] [NbRun] [NomThread] --affiche les stats en fonction du run et du thread choisi\n");
+				if(argc ==  2){
+					printf("--HELP-- \n -h --Aide \n -c [NomBase] --Creer une base de donnée \n -d [NomBase]--Supprimer une base de donnée \n -s [NomBase] [NbRun] [NomThread] --affiche les stats en fonction du run et du thread choisi\n");
+					break;
+				}else
+					return -1;
 			case 'c':
-				db = createDataBase( db, argv[2]);
-				printf("  En cours ...\n");
-				createCommande(db, "PRAGMA synchronous = OFF;");
-				createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, dump int, run int);");
-				createCommande(db, "CREATE TABLE info (datedebut char(50),datefin char(50),heure int, uptime int, run int);");
-				sscanf(parseDuFichier(fichier, db),"D:%d R:%d",&nbDump,&nbRun);
-				printf("nb de run : %d, nb de dump ! %d", nbRun , nbDump);	
-				break;
+				if(argc == 3){
+					db = createDataBase( db, argv[2]);
+					printf("  En cours ...\n");
+					createCommande(db, "PRAGMA synchronous = OFF;");
+					createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, dump int, run int);");
+					createCommande(db, "CREATE TABLE info (datedebut char(50),datefin char(50),heure int, uptime int, run int);");
+					sscanf(parseDuFichier(fichier, db),"D:%d R:%d",&nbDump,&nbRun);
+					printf("nb de run : %d, nb de dump %d\n", nbRun , nbDump);	
+					break;
+				}else
+					return -1;
+				
 			case 'd':
-				supprim( argv[2]);
-				break;
+				if(argc == 3){
+					supprim( argv[2]);
+					break;
+				}else
+					return -1;
 			case 's':
-				db = createDataBase( db, argv[2]);
-				nbRun =  atoi(argv[3]);
-				calculRatioDrop(db,nbRun);
-				requetedebutfin(db,nbRun);
-				moyennedroprun(db, nbRun, argv[4]);
-				moyennepacketrun(db,nbRun, argv[4]);
+				if(argc == 5){
+					db = createDataBase( db, argv[2]);
+					nbRun =  atoi(argv[3]);
+					calculRatioDrop(db,nbRun);
+					requetedebutfin(db,nbRun);
+					moyennedroprun(db, nbRun, argv[4]);
+					moyennepacketrun(db,nbRun, argv[4]);
+					break;
+				}else 
+					return -1;
 			default :
 				exit(EXIT_FAILURE);		
 		}
