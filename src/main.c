@@ -2,7 +2,7 @@
 #include <sqlite3.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <unistd.h>
 
 typedef struct pile
 {
@@ -10,8 +10,20 @@ typedef struct pile
 	struct pile *next;
 } pile ;
 
+void supr(pile *l)
+{
+    pile *c;
+    while(l!= NULL)
+    {
+        c = l;
+        l = l -> next;
+        free(c);
+    }
+}
+
 
 void view(pile *p){
+	p=p->next;
 	while(p)
 	{
 		printf(" %s\n",p->valeur);
@@ -30,7 +42,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 }
 
 static int callback_cal(void * mapile, int argc, char **argv, char **azColName){
-	int i;
+	
 
 	pile *p = (pile *) mapile;
 
@@ -187,79 +199,230 @@ char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 }
 
-//void requetedebutfin(pile * p){
+int requeteDureeRun(struct sqlite3 *db, int nbRun){
 
-//	char * debut = malloc(sizeof(char)*1024);
-//	char * fin = malloc(sizeof(char)*1024);
-
-
-//	view(p);
-
-//	printf("test");
-//	fin = p->valeur;
+	int uptime = 0; //malloc(sizeof(char)*1024);
+	int rc;
+	pile *pileTime = NULL;
+	char *zErrMsg = 0;
+	char * commande = malloc(sizeof(char)*1024);
 	
-//	while(p->prec){
-//		printf("%s \n",p->valeur);
-//		debut = p->valeur;
-//	}
 
-//	printf("debut : %s fin : %s", debut, fin);
+	pile *element = malloc(sizeof(pile));
+	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	element->valeur =  NULL;
+	element->next =  NULL;
+	pileTime = element;       /* Le pointeur pointe sur le dernier élément. */
+	sprintf(commande, "SELECT uptime FROM info WHERE run = %d;",nbRun);
+	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
+	if( rc!=SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	
+	pileTime = pileTime->next;
 
-//}
+	uptime = atoi(pileTime->valeur);
+		
 
-void calcul(struct sqlite3 *db){
 
-	int rc = 0;
-	pile *mapile = NULL;
+	printf("durée du run %d = %d secondes \n", 1, uptime);
+	supr(pileTime);
+
+	return uptime;
+}
+
+void requetedebutfin(struct sqlite3 *db, int nbRun){
+
+	char * debut = malloc(sizeof(char)*1024);
+	char * fin = malloc(sizeof(char)*1024);
+	int rc;
+	pile *pileDate = NULL;
 	char *zErrMsg = 0;
 
 	pile *element = malloc(sizeof(pile));
 	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
 	element->valeur =  NULL;
 	element->next =  NULL;
-	mapile = element;       /* Le pointeur pointe sur le dernier élément. */
+	pileDate = element;       /* Le pointeur pointe sur le dernier élément. */
 
 
-	rc = sqlite3_exec(db,"SELECT uptime FROM info WHERE run = 1;" ,callback_cal,element, &zErrMsg);
+	char * commande = malloc(sizeof(char)*1024);
+	sprintf(commande, "SELECT date FROM info WHERE run = %d;",nbRun);
+
+
+	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
 
-//	requetedebutfin( (pile *) mapile);
-//
-	view( mapile);
-//
-//
+	printf("date %s \n",pileDate->valeur);
+	pileDate = pileDate->next;
+
+//	view(p);
+
+//	printf("test");
+	fin = pileDate->valeur;
+	
+	while(pileDate){
+		if(pileDate->next == NULL){	
+			debut = pileDate->valeur;
+			}
+		pileDate = pileDate->next;
+	
+	}
+
+	printf("debut : %s fin : %s \n", debut, fin);
+	supr(pileDate);
 
 }
+
+ long long int somme(pile * p){
+
+	long long int resultat = 0;
+	p = p->next;
+	while(p){
+		resultat = resultat + atoi(p->valeur);
+		p = p->next;
+	
+	}
+			
+	return resultat;
+}
+long long int nbdrop(struct sqlite3 *db, int nbRun){
+
+	int rc = 0;
+	pile *pileDrop = NULL;
+	char *zErrMsg = 0;
+	long long int resultat = 0;
+
+	pile *element = malloc(sizeof(pile));
+	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	element->valeur =  NULL;
+	element->next =  NULL;
+	pileDrop = element;       /* Le pointeur pointe sur le dernier élément. */
+
+	char * commande = malloc(sizeof(char)*1024);
+	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_drops\";",nbRun);
+
+
+	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
+	if( rc!=SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+
+	resultat = somme(pileDrop);
+	supr(pileDrop);
+
+
+	return resultat;
+}
+
+long long int nbpacket(struct sqlite3 *db, int nbRun){
+
+	int rc = 0;
+	pile *pilePacket = NULL;
+	char *zErrMsg = 0;
+	long long int resultat = 0;
+
+	pile *element = malloc(sizeof(pile));
+	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
+	element->valeur =  NULL;
+	element->next =  NULL;
+	pilePacket = element;       /* Le pointeur pointe sur le dernier élément. */
+
+	char * commande = malloc(sizeof(char)*1024);
+	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_packets\";",nbRun);
+
+
+	rc = sqlite3_exec(db,commande,callback_cal,element, &zErrMsg);
+	if( rc!=SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+
+	resultat = somme(pilePacket);
+	supr(pilePacket);
+
+
+	return resultat;
+}
+
+void calculRatioDrop(struct sqlite3 *db, int nbRun){
+
+	long long int drops = nbdrop(db, nbRun);
+	long long int packets = nbpacket(db, nbRun);
+	
+	
+	int resultat = 0;
+	
+	resultat = drops * 100 / packets;
+
+
+
+	printf("ratio kernel drop pour run %d = %d % !\n",1,resultat);
+//view( mapile);
+	
+	}
+	
+void moyennedroprun(struct sqlite3 * db, int nbRun){
+
+	long long int drops = 0;
+	int duree = 0;	
+	long long int resultat = 0;
+	
+	drops = nbdrop(db, nbRun);
+	duree = requeteDureeRun(db,nbRun);
+	resultat = resultat +drops / duree;
+	
+	printf("drop/sec = %lld \n", resultat);
+	
+	
+}
+	
 int main(int argc, char **argv){
 
+
+	int opt; 
 	struct sqlite3 *db = NULL;
 	FILE * fichier;
 	int nbRun, nbThread;
 	fichier = ouverture("stat.log");
+	
+	
+	while( (opt = getopt(argc, argv, "hcds:")) !=-1){
+	
+		switch (opt){
+		
+			case 'h':
+				printf("HELP");
+			case 'c':
+				db = createDataBase( db, argv[optind]);
 
-
-
-	if(argc > 1) {
-		db = createDataBase( db, argv[1]);
-		createCommande(db, "PRAGMA synchronous = OFF;");
-		createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, thread int, run int);");
-		createCommande(db, "CREATE TABLE info (date char(50),heure int, uptime int, thread int, run int);");
+				printf("  En cours ...\n");
+				createCommande(db, "PRAGMA synchronous = OFF;");
+				createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, thread int, run int);");
+				createCommande(db, "CREATE TABLE info (date char(50),heure int, uptime int, thread int, run int);");
+				sscanf(parseDuFichier(fichier, db),"T:%d R:%d",&nbThread,&nbRun);	
+				printf("  Fini!  \n");
+				break;
+			case 'd':
+				break;
+			case 's':
+				calculRatioDrop(db,nbRun);
+				requetedebutfin(db,nbRun);
+				requeteDureeRun(db,nbRun);
+				moyennedroprun(db, nbRun);
+		
+		}
+	
+	
 	}
-	printf("  En cours ...\n");
-//		sscanf(parseDuFichier(fichier, db),"T:%d R:%d",&nbThread,&nbRun);	
-
-
-//		createCommande(db, "SELECT uptime FROM info WHERE run = 2;");
 
 
 	printf("  Fini!  \n");	
-
-	calcul(db);
-
-//	printf("  Fini!  %d %d \n",nbRun, nbThread);	
 	return 0;
 }
