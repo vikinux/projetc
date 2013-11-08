@@ -4,23 +4,28 @@
 #include <string.h>
 #include <unistd.h>
 
+
+/****************************************************************************/
 typedef struct pile
 {
 	char * valeur;
 	struct pile *next;
 } pile ;
 
+/****************************************************************************/
+
 void supr(pile *l)
 {
-    pile *c;
-    while(l!= NULL)
-    {
-        c = l;
-        l = l -> next;
-        free(c);
-    }
+	pile *c;
+	while(l!= NULL)
+	{
+		c = l;
+		l = l -> next;
+		free(c);
+	}
 }
 
+/****************************************************************************/
 
 void view(pile *p){
 	p=p->next;
@@ -31,6 +36,7 @@ void view(pile *p){
 	}
 }
 
+/****************************************************************************/
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 	int i;
@@ -40,26 +46,25 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
 	}
 	return 0;
 }
+/****************************************************************************/
 
 static int callback_cal(void * mapile, int argc, char **argv, char **azColName){
-	
 
-	pile *p = (pile *) mapile;
+	pile **p = (pile **) mapile;
 
 	pile *element = malloc(sizeof(pile));
 	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
 	element->valeur =  strdup(argv[0]);
-	element->next = p->next;
-	p->next = element;
-	p = element;      
+	element->next = (*p);
+	*p = element;      
 
+	//	printf("%s \n",(*p)->valeur);
 
-	mapile = (void *) p;
-	
 
 	return 0;
 }
 
+/****************************************************************************/
 
 sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 	int rc;
@@ -68,9 +73,11 @@ sqlite3 * createDataBase( sqlite3 * db, char * dbName){
 		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
 		sqlite3_close(db);
 	}
-	printf("\n Creation de la database %s \n\n",dbName);
+	printf("\n Creation/Ouverture de la database %s \n\n",dbName);
 	return db;
 }
+
+/****************************************************************************/
 
 int createCommande(sqlite3 * db, char * commande ){
 	int rc=-1;
@@ -84,6 +91,8 @@ int createCommande(sqlite3 * db, char * commande ){
 	return rc;
 }
 
+/****************************************************************************/
+
 FILE * ouverture(char * nomFichier){
 
 	FILE * fichier;
@@ -96,7 +105,9 @@ FILE * ouverture(char * nomFichier){
 	return fichier;
 }
 
-long long int date( char * line, int thread,struct sqlite3 *db, int nbRun, int previous){
+/****************************************************************************/
+
+long long int date( char * line, struct sqlite3 *db, int nbRun, int previous){
 
 	char * token = malloc(sizeof(char)*1024);
 	int jour;
@@ -110,15 +121,21 @@ long long int date( char * line, int thread,struct sqlite3 *db, int nbRun, int p
 
 	uptime = (up_s) +(up_m *60)+(up_h *60*60)+(up_d *24*60*60);
 	uphour = (sec) +(min *60)+(heure *60*60);
-	sprintf(tmp, "%d/%d/%d",jour,mois,ans);
+	sprintf(tmp, "%d/%d/%d %d:%d:%d",jour,mois,ans,heure,min,sec);
 
-
-	if(uptime < previous)
+	if(uptime < previous){
 		nbRun ++;
 
-	sprintf(token,"INSERT INTO info values(\"%s\",%lld,%lld,%d,%d);",tmp,uphour,uptime,thread,nbRun);
+		sprintf(token,"INSERT INTO info values(\"%s\",\"%s\",%lld,%lld,%d);",tmp, tmp ,uphour,uptime,nbRun);
 
-	createCommande(db, token);
+		createCommande(db, token);
+
+	}else{
+		sprintf(token,"UPDATE info SET uptime = %lld WHERE run = %d;",uptime,nbRun);
+		createCommande(db, token);
+		sprintf(token,"UPDATE info SET datefin = \"%s\" WHERE run = %d;",tmp,nbRun);
+		createCommande(db, token);
+	}
 
 	free(token);
 	free(tmp);
@@ -126,17 +143,18 @@ long long int date( char * line, int thread,struct sqlite3 *db, int nbRun, int p
 	return uptime;
 }
 
-void param(char * line, int nbthread, struct sqlite3 *db, int nbRun){
+/****************************************************************************/
+
+void param(char * line, int nbDump, struct sqlite3 *db, int nbRun){
 
 	char * token = malloc(sizeof(char)*1024);
 	char * token2 =  malloc(sizeof(char)*1024);
 	char * token3 =  malloc(sizeof(char)*1024);
 	char * commande = malloc(sizeof(char)*1024);
 
-
 	sscanf(line, " %s | %s | %s \n", token, token2, token3);
 
-	sprintf(commande,"INSERT INTO param values(\"%s\",\"%s\",\"%s\",%d,%d);",token,token2,token3,nbthread,nbRun);
+	sprintf(commande,"INSERT INTO param values(\"%s\",\"%s\",\"%s\",%d,%d);",token,token2,token3,nbDump,nbRun);
 
 	createCommande(db, commande);
 
@@ -146,94 +164,88 @@ void param(char * line, int nbthread, struct sqlite3 *db, int nbRun){
 	free(commande);
 }
 
+/****************************************************************************/
+
 char * parseDuFichier( FILE * fichier, struct sqlite3 *db){
 
 	char * ligne = malloc(sizeof(char)*1024);
-	int nbThread = 0;
+	int nbDump = 0;
 	int nbRun = 0;
-	int nbThreadTotal=0;
-	long long int previous_runtime = 10;
+	int nbDumpTotal=0;
+	long long int previous_runtime = 100;
 	long long int runtime = 0;
 	char * resultat = malloc(sizeof(char)*1024);
 
 
 	while(fscanf(fichier, "%[^\n]\n", ligne) > 0){
-
-
-		//	printf("%s \n",ligne);
 		if(ligne[0] == '-'){
-			nbThread ++;
+			nbDump ++;
 			fscanf(fichier, "%[^\n]\n", ligne);
-			//	runtime = date(ligne,nbThread,db, nbRun);
+
+			runtime = date(ligne,db, nbRun, previous_runtime);
+
 
 			if(runtime >= previous_runtime){
 				previous_runtime = runtime;
 			}
 			else{
-				nbRun ++;
+				nbRun++;
 				previous_runtime = runtime;
-				nbThreadTotal += nbThread;
-				nbThread = 0;
+				nbDumpTotal += nbDump;
+				nbDump = 0;
 
 			}
-
-
-			runtime = date(ligne,nbThread,db, nbRun, previous_runtime);
-
-
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 			fscanf(fichier, "%[^\n]\n", ligne) ;
 		}
 		else {
-			param(ligne, nbThread, db, nbRun);
+			param(ligne, nbDump, db, nbRun);
 		}
-
 	}
-	nbThreadTotal += nbThread;
-
+	nbDumpTotal += nbDump;
 
 	free(ligne);
-	sprintf(resultat,"T:%d R:%d",nbThreadTotal, nbRun);
+	sprintf(resultat,"D:%d R:%d",nbDumpTotal, nbRun);
 	return resultat;
 
 }
 
+/****************************************************************************/
+
 int requeteDureeRun(struct sqlite3 *db, int nbRun){
 
-	int uptime = 0; //malloc(sizeof(char)*1024);
+	int uptime = 0; 
 	int rc;
 	pile *pileTime = NULL;
 	char *zErrMsg = 0;
 	char * commande = malloc(sizeof(char)*1024);
-	
+
 
 	pile *element = malloc(sizeof(pile));
 	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
 	element->valeur =  NULL;
 	element->next =  NULL;
 	pileTime = element;       /* Le pointeur pointe sur le dernier élément. */
+
 	sprintf(commande, "SELECT uptime FROM info WHERE run = %d;",nbRun);
-	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
+
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
-	
-	view(pileTime);
-	printf("pileTime : %s \n", pileTime->valeur);	
-	pileTime = pileTime->next;
-	printf("pileTime : %s \n", pileTime->valeur);
+	pileTime = (pile *) element;
+
 	uptime = atoi(pileTime->valeur);
-		
 
-
-	printf("durée du run %d = %d secondes \n", 1, uptime);
 	supr(pileTime);
 
 	return uptime;
 }
+
+/****************************************************************************/
 
 void requetedebutfin(struct sqlite3 *db, int nbRun){
 
@@ -247,54 +259,55 @@ void requetedebutfin(struct sqlite3 *db, int nbRun){
 	if(!element) exit(EXIT_FAILURE);     /* Si l'allocation a échouée. */
 	element->valeur =  NULL;
 	element->next =  NULL;
-	pileDate = element;       /* Le pointeur pointe sur le dernier élément. */
 
 
 	char * commande = malloc(sizeof(char)*1024);
-	sprintf(commande, "SELECT date FROM info WHERE run = %d;",nbRun);
+	sprintf(commande, "SELECT datedebut FROM info WHERE run = %d;",nbRun);
 
 
-	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
+	pileDate = (pile *) element;  
+	debut = pileDate->valeur;
 
-	printf("date %s \n",pileDate->valeur);
-	pileDate = pileDate->next;
-
-//	view(p);
-
-//	printf("test");
-	fin = pileDate->valeur;
-	
-	while(pileDate){
-		if(pileDate->next == NULL){	
-			debut = pileDate->valeur;
-			}
-		pileDate = pileDate->next;
-	
+	sprintf(commande, "SELECT datefin FROM info WHERE run = %d;",nbRun);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
+	if( rc!=SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
 	}
+	pileDate = (pile *) element;  
 
-	printf("debut : %s fin : %s \n", debut, fin);
+	fin = pileDate->valeur;
+
+	printf("run : %d , debut : %s fin : %s \n",nbRun, debut, fin);
 	supr(pileDate);
 
 }
 
- long long int somme(pile * p){
+/****************************************************************************/
+
+long long int plusgrand(pile * p){
 
 	long long int resultat = 0;
-	p = p->next;
-	while(p){
-		resultat = resultat + atoi(p->valeur);
+	while(p->next){
+
+		if(resultat <= atoi(p->valeur) )
+			resultat = atoi(p->valeur);
 		p = p->next;
-	
+
 	}
-			
+
 	return resultat;
 }
-long long int nbdrop(struct sqlite3 *db, int nbRun){
+
+/****************************************************************************/
+
+long long int nbdrop(struct sqlite3 *db, int nbRun, char * thread){
 
 	int rc = 0;
 	pile *pileDrop = NULL;
@@ -308,23 +321,28 @@ long long int nbdrop(struct sqlite3 *db, int nbRun){
 	pileDrop = element;       /* Le pointeur pointe sur le dernier élément. */
 
 	char * commande = malloc(sizeof(char)*1024);
-	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_drops\";",nbRun);
+	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_drops\" %s;",nbRun,thread);
 
 
-	rc = sqlite3_exec(db,commande ,callback_cal,element, &zErrMsg);
+	rc = sqlite3_exec(db,commande ,callback_cal,&element, &zErrMsg);
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
 
-	resultat = somme(pileDrop);
+	pileDrop = (pile *) element;
+
+	resultat = plusgrand(pileDrop);
+
 	supr(pileDrop);
 
 
 	return resultat;
 }
 
-long long int nbpacket(struct sqlite3 *db, int nbRun){
+/****************************************************************************/
+
+long long int nbpacket(struct sqlite3 *db, int nbRun, char * thread){
 
 	int rc = 0;
 	pile *pilePacket = NULL;
@@ -338,95 +356,123 @@ long long int nbpacket(struct sqlite3 *db, int nbRun){
 	pilePacket = element;       /* Le pointeur pointe sur le dernier élément. */
 
 	char * commande = malloc(sizeof(char)*1024);
-	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_packets\";",nbRun);
+	sprintf(commande, "SELECT col3  FROM param WHERE run = %d AND col1 = \"capture.kernel_packets\" %s;",nbRun, thread);
 
-
-	rc = sqlite3_exec(db,commande,callback_cal,element, &zErrMsg);
+	rc = sqlite3_exec(db,commande,callback_cal,&element, &zErrMsg);
 	if( rc!=SQLITE_OK ){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
+	pilePacket = (pile *) element;
+	resultat = plusgrand(pilePacket);
 
-	resultat = somme(pilePacket);
 	supr(pilePacket);
-
 
 	return resultat;
 }
 
+/****************************************************************************/
+
 void calculRatioDrop(struct sqlite3 *db, int nbRun){
 
-	long long int drops = nbdrop(db, nbRun);
-	long long int packets = nbpacket(db, nbRun);
-	
-	
+	long long int drops = nbdrop(db, nbRun, " ");
+	long long int packets = nbpacket(db, nbRun," ");
 	int resultat = 0;
-	
+
 	resultat = drops * 100 / packets;
 
+	printf("ratio kernel drop pour run %d = %d pourcents \n",nbRun,resultat);
+	//view( mapile);
 
+}
 
-	printf("ratio kernel drop pour run %d = %d \"%\"\n",1,resultat);
-//view( mapile);
-	
-	}
-	
-void moyennedroprun(struct sqlite3 * db, int nbRun){
+/****************************************************************************/
+
+void moyennedroprun(struct sqlite3 * db, int nbRun, char * thread){
 
 	long long int drops = 0;
 	int duree = 0;	
-	long long int resultat = 0;
-	
-	drops = nbdrop(db, nbRun);
+	long long int resultat = 0;	
+
+	char * commande = malloc(sizeof(char)*1024);
+	sprintf(commande, "AND col2 = \"%s\"",thread);
+
+	drops = nbdrop(db, nbRun,commande);
 	duree = requeteDureeRun(db,nbRun);
-	resultat = resultat +drops / duree;
-	
-	printf("drop/sec = %lld \n", resultat);
-	
-	
+	resultat = drops / duree;
+
+	printf("durée du run %d = %d secondes \n", nbRun, duree);
+	printf("run : %d, thread : %s, drop/sec = %lld \n",nbRun, thread, resultat);
+
 }
-	
+
+/****************************************************************************/
+
+void moyennepacketrun(struct sqlite3 * db, int nbRun, char * thread){
+
+	long long int packet = 0;
+	int duree = 0;	
+	long long int resultat = 0;
+	char * commande = malloc(sizeof(char)*1024);
+
+	sprintf(commande, "AND col2 = \"%s\" ",thread);
+	packet = nbpacket(db, nbRun, commande);
+	duree = requeteDureeRun(db,nbRun);
+	resultat = packet / duree;
+
+	printf("run : %d, thread : %s ,  packet/sec = %lld \n",nbRun,thread, resultat);
+
+}
+
+/****************************************************************************/
+
+void supprim(char * filename){
+
+	printf("suppr de %s\n ", filename);
+	remove(filename);
+
+}
+
+/****************************************************************************/
+/****************************************************************************/
+
 int main(int argc, char **argv){
 
-
 	int opt; 
-	int rc = 0;
 	struct sqlite3 *db = NULL;
 	FILE * fichier;
-	int nbRun, nbThread;
+	int nbRun, nbDump;
 	fichier = ouverture("stat.log");
-	
-	
+
 	while( (opt = getopt(argc, argv, "hcds")) !=-1){
-	
+
 		switch (opt){
-		
+
 			case 'h':
-				printf("HELP");
+				printf("--HELP-- \n -h --Aide \n -c [NomBase] --Creer une base de donnée \n -d [NomBase]--Supprimer une base de donnée \n -s [NomBase] [NbRun] [NomThread] --affiche les stats en fonction du run et du thread choisi\n");
 			case 'c':
 				db = createDataBase( db, argv[2]);
 				printf("  En cours ...\n");
 				createCommande(db, "PRAGMA synchronous = OFF;");
-				createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, thread int, run int);");
-				createCommande(db, "CREATE TABLE info (date char(50),heure int, uptime int, thread int, run int);");
-				sscanf(parseDuFichier(fichier, db),"T:%d R:%d",&nbThread,&nbRun);	
-				printf("  Fini!  \n");
+				createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, dump int, run int);");
+				createCommande(db, "CREATE TABLE info (datedebut char(50),datefin char(50),heure int, uptime int, run int);");
+				sscanf(parseDuFichier(fichier, db),"D:%d R:%d",&nbDump,&nbRun);
+				printf("nb de run : %d, nb de dump ! %d", nbRun , nbDump);	
 				break;
 			case 'd':
+				supprim( argv[2]);
 				break;
 			case 's':
-				db = createDataBase( db, argv[1]);
-				nbRun = 1;
+				db = createDataBase( db, argv[2]);
+				nbRun =  atoi(argv[3]);
 				calculRatioDrop(db,nbRun);
 				requetedebutfin(db,nbRun);
-				requeteDureeRun(db,nbRun);
-				moyennedroprun(db, nbRun);
-		
+				moyennedroprun(db, nbRun, argv[4]);
+				moyennepacketrun(db,nbRun, argv[4]);
+			default :
+				exit(EXIT_FAILURE);		
 		}
-	
-	
 	}
-
 
 	printf("  Fini!  \n");	
 	return 0;
