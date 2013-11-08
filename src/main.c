@@ -110,8 +110,8 @@ long long int date( char * line, int thread,struct sqlite3 *db, int nbRun, int p
 
 	uptime = (up_s) +(up_m *60)+(up_h *60*60)+(up_d *24*60*60);
 	uphour = (sec) +(min *60)+(heure *60*60);
-
 	sprintf(tmp, "%d/%d/%d",jour,mois,ans);
+
 
 	if(uptime < previous)
 		nbRun ++;
@@ -219,9 +219,12 @@ int requeteDureeRun(struct sqlite3 *db, int nbRun){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
-	
-	pileTime = pileTime->next;
 
+	
+	view(pileTime);
+	printf("pileTime : %s \n", pileTime->valeur);	
+	pileTime = pileTime->next;
+	printf("pileTime : %s \n", pileTime->valeur);
 	uptime = atoi(pileTime->valeur);
 		
 
@@ -363,7 +366,7 @@ void calculRatioDrop(struct sqlite3 *db, int nbRun){
 
 
 
-	printf("ratio kernel drop pour run %d = %d % !\n",1,resultat);
+	printf("ratio kernel drop pour run %d = %d \"%\"\n",1,resultat);
 //view( mapile);
 	
 	}
@@ -387,21 +390,21 @@ int main(int argc, char **argv){
 
 
 	int opt; 
+	int rc = 0;
 	struct sqlite3 *db = NULL;
 	FILE * fichier;
 	int nbRun, nbThread;
 	fichier = ouverture("stat.log");
 	
 	
-	while( (opt = getopt(argc, argv, "hcds:")) !=-1){
+	while( (opt = getopt(argc, argv, "hcds")) !=-1){
 	
 		switch (opt){
 		
 			case 'h':
 				printf("HELP");
 			case 'c':
-				db = createDataBase( db, argv[optind]);
-
+				db = createDataBase( db, argv[2]);
 				printf("  En cours ...\n");
 				createCommande(db, "PRAGMA synchronous = OFF;");
 				createCommande(db, "CREATE TABLE param (col1 char(50), col2 char(50), col3 int, thread int, run int);");
@@ -412,6 +415,8 @@ int main(int argc, char **argv){
 			case 'd':
 				break;
 			case 's':
+				db = createDataBase( db, argv[1]);
+				nbRun = 1;
 				calculRatioDrop(db,nbRun);
 				requetedebutfin(db,nbRun);
 				requeteDureeRun(db,nbRun);
